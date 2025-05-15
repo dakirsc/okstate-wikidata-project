@@ -11,6 +11,7 @@ library(tidyverse)
 library(glue)
 library(httr)
 library(usethis)
+library(janitor)
 
 # mark system date for use in file naming
 today <- Sys.Date()
