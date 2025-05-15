@@ -5,6 +5,7 @@ library(tidyverse)
 # Extract QIDs using ORCID iDs --------------------------------------------
 
 # import list of ORCID iDs 
+# NOTE - your file name will be different
 orcid_list <- read_csv("data/my_orcids_data_2025-05-09.csv")
 
 # extract just the list of ORCID iDs
@@ -14,7 +15,7 @@ orcid_vec <- orcid_list$orcid_identifier_path
 qid_df <- data.frame(matrix(nrow = length(orcid_vec), ncol = 2))
 colnames(qid_df) <- c("orcid","qid")
 
-# iterate through the list of ORCID iDs
+# iterate through the list of ORCID iDs (this may take a while)
 # for each ORCID iD, use the qid_from_ORCID function
 # and search for the ORCID iD in Wikidata
 # if found, extract the QID (Wikidata ID)
@@ -25,7 +26,7 @@ for(x in orcid_vec){
 }
 
 # how many ORCID iDs matched a QID?
-sum(!is.na(qid_df$qid)) # 858 unique QIDs
+sum(!is.na(qid_df$qid)) 
 
 # write this file to CSV
 write_csv(qid_df,paste0("data/orcid_qid_",today,".csv"))
@@ -36,7 +37,8 @@ write_csv(qid_df,paste0("data/orcid_qid_",today,".csv"))
 # read in QID-ORCID dataframe 
 # filter out entries without QIDs
 # extract QIDs into a list
-qid_list <- read_csv("data/orcid_qid_2025-05-09.csv") %>% 
+# NOTE: your file name is likely different
+qid_list <- read_csv("data/orcid_qid_2025-05-15.csv") %>% 
   filter(!is.na(qid)) %>% 
   pull(qid)
 
@@ -85,7 +87,7 @@ write_csv(qid_info_clean,paste0("data/property_per_qid_",today,".csv"))
 
 
 # Initial Property & QID Exploration --------------------------------------------
-qid_info_clean <- read_csv(paste0("data/property_per_qid_",today,".csv"))
+head(qid_info_clean)
 
 ### Property Lists per QID --------------------------------------------------
 
