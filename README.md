@@ -32,12 +32,13 @@ The remaining scripts were compiled specifically for this project and were made 
 ## Contact Information  
 **Principal Project Manager**  
 Name: Dani Kirsch  
-ORCID: 0000-0002-0928-3778  
+ORCID: [0000-0002-0928-3778](https://orcid.org/0000-0002-0928-3778)  
 Institution: Oklahoma State University  
 Email: danielle.kirsch@okstate.edu  
 
 **Graduate Research Assistant** (January 2025 - May 2025)  
 Name: Rachana Kulkarni  
+LinkedIn: [rachanakulkarni17](https://www.linkedin.com/in/rachanakulkarni17)  
 Institution: Oklahoma State University  
 Email: rachana.kulkarni@okstate.edu  
 
