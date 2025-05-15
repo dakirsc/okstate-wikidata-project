@@ -13,7 +13,8 @@ today <- Sys.Date()
 # read in QID-ORCID dataframe 
 # filter out entries without QIDs
 # extract QIDs into a list
-qid_list <- read_csv("data/orcid_qid_2025-05-09.csv") %>% 
+# NOTE: your file name is likely different
+qid_list <- read_csv("data/orcid_qid_2025-05-15.csv") %>% 
   filter(!is.na(qid)) %>% 
   pull(qid)
 
@@ -40,7 +41,7 @@ unique(qid_basic$rank) # normal, preferred, deprecated, NA
 # extract the QIDs returned as property values
 # regular expression searches for items in the "value" column
 # that start with Q and are followed by 1 or more digits
-# trims out ~
+# pulls these values into a list
 property_value_qid <- qid_basic %>% 
   filter(grepl("^Q[0-9]+",value)) %>% 
   select(value) %>% 
@@ -50,44 +51,32 @@ property_value_qid <- qid_basic %>%
 
 # Round 2 - Property Value QIDs -------------------------------------------
 
-# Researcher --> Property --> QID -->
+# Researcher --> Property --> QID --> label
 
-# get info on those QIDs
-prop_val_qid_basic <- tw_get(property_value_qid)
+# get labels for those QIDs (this may take a while)
+prop_val_qid_label <- tw_get_label(property_value_qid)
 
-head(prop_val_qid_basic)
-# id  property  value rank
+# merge QIDs and labels
+pv_qid_label_merge <- as.data.frame(cbind(property_value_qid,prop_val_qid_label))
 
 # rename columns
-colnames(prop_val_qid_basic) <- c("pv_qid","pv_qid_property",
-                                 "pv_qid_value", "pv_qid_rank")
+colnames(pv_qid_label_merge) <- c("pv_qid","pv_qid_label")
 
-# determine important info
-prop_val_qid_basic %>% 
-  select(pv_qid_property) %>% 
-  distinct() %>% 
-  arrange(desc(pv_qid_property))
-
-# extract the item name of the property value QID (e.g., Q5 = human)
-# may not have a label_en for every value
-pv_qid_item_label <- prop_val_qid_basic %>% 
-  filter(pv_qid_property %in% c("label_en")) %>% 
-  distinct()
+head(pv_qid_label_merge)
 
 # then merge this information with qid_basic data frame
 pv_qid_merge <- qid_basic %>% 
-  left_join(.,pv_qid_item_label, by = c("value" = "pv_qid"))
+  left_join(.,pv_qid_label_merge, by = c("value" = "pv_qid"))
 
-write_csv(pv_qid_merge,
-          paste0("data/pv_qid_merge_", today, ".csv"))
-
+# save this iteration
+write_csv(pv_qid_merge,paste0("data/pv_qid_label_only_",today,".csv"))
 
 ### Extracting Qualifiers ---------------------------------------------------------
 # Researcher --> Property --> Value 1 (+ Qualifiers) + Value 2 (+ Qualifiers)
 
 # trying to get more granular data
-pv_qid_df <- read_csv(paste0("data/pv_qid_merge_", today, ".csv")) %>% 
-  select(id, property,value,pv_qid_value)
+pv_qid_df <- pv_qid_merge %>% 
+  select(id, property,value,pv_qid_label)
 
 # if interested (or relevant), can identify "duplicate" properties & values
 # which should be distinguished by qualifiers (if info is present)
@@ -104,7 +93,8 @@ pv_qualifiers <- tw_get_qualifiers(id = pv_qid_df$id,
 
 head(pv_qualifiers)
 
-# combine with original lvl1 info
+# combine with qid-property-value info
+# there may be multiple matches, since a property/value can have more than one qualifier
 pv_qid_qual <- pv_qid_df %>% 
   left_join(.,pv_qualifiers,
             by = c("id" = "id",
@@ -119,56 +109,42 @@ write_csv(pv_qid_qual,
 # Round 3 - Qualifier Value QIDs -----------------------------------------------------
 # Researcher --> Property --> Value --> Qualifier Property --> QID
 
-pv_qid_qual_df <- read_csv(paste0("data/pv_qid_qual_", today, ".csv"))
-
 # types of items reported as qualifiers
-pv_qid_qual_df %>% 
+pv_qid_qual %>% 
   group_by(qualifier_value_type) %>% 
   count()
 
 # wikibase-entityid --> indicates QIDs
-pvq_qual_qid_list <- pv_qid_qual_df %>% 
+pvq_qual_qid_list <- pv_qid_qual %>% 
   filter(qualifier_value_type == "wikibase-entityid") %>% 
   select(qualifier_value) %>% 
   distinct() %>% 
   pull()
   
 
-# get info on those QIDs
-pvq_qual_qid_info <- tw_get(pvq_qual_qid_list)
+# get label from those QIDs
+pvq_qual_qid_label <- tw_get_label(pvq_qual_qid_list)
 
-head(pvq_qual_qid_info)
-# id  property  value rank
+# merge QIDs and labels
+pv_qual_qid_label_merge <- as.data.frame(cbind(pvq_qual_qid_list,pvq_qual_qid_label))
 
 # rename columns
-colnames(pvq_qual_qid_info) <- c("qual_qid","qual_qid_property",
-                                 "qual_qid_value", "qual_qid_rank")
+colnames(pv_qual_qid_label_merge) <- c("qual_qid","qual_qid_label")
 
-# determine important info
-pvq_qual_qid_info %>% 
-  select(qual_qid_property) %>% 
-  distinct() %>% 
-  arrange(desc(qual_qid_property))
-
-pvq_qual_qid_label <- pvq_qual_qid_info %>% 
-  filter(qual_qid_property %in% c("label_en")) %>% 
-  distinct()
+head(pv_qual_qid_label_merge)
 
 # then merge this information with qid_info data frame
-pvq_qual_qid_merge <- pv_qid_qual_df %>% 
-  left_join(.,pvq_qual_qid_label, by = c("qualifier_value" = "qual_qid")) %>% 
-  select(id,property,value,pv_qid_value,
+pvq_qual_qid_merge <- pv_qid_qual %>% 
+  left_join(.,pv_qual_qid_label_merge, by = c("qualifier_value" = "qual_qid")) %>% 
+  select(id,property,value,pv_qid_label,
          qualifier_property,qualifier_value,
-         qual_qid_value,everything())
+         qual_qid_label,everything())
 
 write_csv(pvq_qual_qid_merge,
-          paste0("data/pvq_qual_qid_merge_", today, ".csv"))
+          paste0("data/pvq_qual_qid_label_", today, ".csv"))
 
 
 # Info on Properties ---------------------------------------------------
-
-# variable "property" in pvq_qual_qid_merge_DATE.csv dataframe
-pvq_qual_qid_merge <- read_csv(paste0("data/pvq_qual_qid_merge_", today, ".csv"))
 
 ### QID Property Label & Description ------------------------------------------------
 
@@ -219,8 +195,8 @@ qual_qid_prop_all <- pvq_qual_qid_merge %>%
   #        "qual_property_lab" = "lvl2_qual_property_lab",
   #        "qual_property_desc" = "lvl2_qual_property_desc") %>% 
   select(id,property,qid_prop_lab,qid_prop_desc,value,
-         pv_qid_value,qualifier_property,qual_qid_prop_lab,
-         qual_qid_prop_desc,qualifier_value,qual_qid_value,
+         pv_qid_label,qualifier_property,qual_qid_prop_lab,
+         qual_qid_prop_desc,qualifier_value,qual_qid_label,
          everything())
 
 
@@ -231,7 +207,8 @@ write_csv(qual_qid_prop_all,
 # Data Visualization ------------------------------------------------------
 
 # write to CSV
-prop_freq <- read_csv(paste0("data/property_qid_frequency_",today,".csv")) %>% 
+# NOTE: your file name is likely different
+prop_freq <- read_csv(paste0("data/property_qid_frequency_2025-05-13.csv")) %>% 
   select(prop_id,count) %>% 
   mutate(prop_name = tw_get_property_label(prop_id))
 
@@ -273,14 +250,16 @@ for(x in 1:length(osu_qids)){
   osu_qid_df[item,2] <- osu_qids[[item]]$label
 }
 
-# filter out unneeded entries
-# and pull out list of QIDs
+# list out unneeded entries (your will be different)
+# e.g., Oklahoma State Cowboys and Cowgirls (sports teams), Oklahoma State University Bookstore
+
 osu_removals <- c("Q3001865","Q7082382","Q7082380",
                   "Q7082387","Q67425031","Q29007509",
                   "Q99476304","Q67421779","Q132577836")
 
+# and extract the desired institutional QIDs
 osu_qid_list <- osu_qid_df %>% 
-  filter(!(qid %in% osu_removals)) %>%  # remove Oklahoma State Cowboys and Cowgirls
+  filter(!(qid %in% osu_removals)) %>%  
   pull(qid)
 
 # search for values and qualifier values with OSU mentions
@@ -292,32 +271,41 @@ osu_in_wikidata <- qual_qid_prop_all %>%
 # what properties are they providing info for?
 osu_in_wikidata %>% 
   group_by(qid_prop_lab,qual_qid_prop_lab) %>% 
-  count()
+  count() %>% 
+  arrange(desc(n))
+
+# for qualifier info, which QIDs have these?
+osu_qual_mentions <- osu_in_wikidata %>% 
+  filter(qualifier_value %in% osu_qid_list) %>% 
+  select(id,qid_prop_lab,qual_qid_prop_lab,qualifier_value) %>% 
+  distinct() %>% 
+  pull()
 
 # which OSU QIDs are being used?
 osu_in_wikidata %>% 
-  group_by(pv_qid_value) %>% 
-  count()
+  group_by(pv_qid_label) %>% 
+  count() %>% 
+  arrange(desc(n))
 
 osu_in_wikidata %>% 
-  group_by(qual_qid_value) %>% 
+  group_by(qual_qid_label) %>% 
   count() %>% 
-  arrange(qual_qid_value) %>% # alphabetize
+  arrange(qual_qid_label) %>% # alphabetize
   print(n = 50) 
 
 
 ### Visualize OSU Affiliations ----------------------------------------------
 
 osu_in_wikidata %>% 
-  filter(!is.na(pv_qid_value)) %>% 
-  select(id,value,pv_qid_value) %>% 
+  filter(!is.na(pv_qid_label)) %>% 
+  select(id,value,pv_qid_label) %>% 
   distinct() %>% 
-  group_by(value,pv_qid_value) %>% 
+  group_by(value,pv_qid_label) %>% 
   count() %>% 
-  mutate(pv_qid_value = gsub("Oklahoma State University",
+  mutate(pv_qid_label = gsub("Oklahoma State University",
                              "OSU",
-                             pv_qid_value)) %>% 
-  ggplot(aes(x = reorder(pv_qid_value,-n),
+                             pv_qid_label)) %>% 
+  ggplot(aes(x = reorder(pv_qid_label,-n),
              y = n)) +
   geom_bar(stat = "identity",
            fill = "black") +
